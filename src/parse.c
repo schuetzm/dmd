@@ -5096,7 +5096,20 @@ Statement *Parser::parseStatement(int flags, const utf8_t** endPtr)
             check(TOKlparen);
             exp = parseExpression();
             check(TOKrparen);
-            body = parseStatement(PSscope);
+            if (token.value == TOKcolon)
+            {
+                nextToken();
+                Statements *statements = new Statements();
+                while (token.value != TOKrcurly && token.value != TOKeof)
+                {
+                    statements->push(parseStatement(PSsemi | PScurlyscope));
+                }
+                body = new CompoundStatement(loc, statements);
+            }
+            else
+            {
+                body = parseStatement(PSscope);
+            }
             s = new WithStatement(loc, exp, body);
             break;
         }
