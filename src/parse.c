@@ -418,6 +418,12 @@ Dsymbols *Parser::parseDeclDefs(int once, Dsymbol **pLastDecl, PrefixAttributes 
                 stc = STCconst;
                 goto Lstc;
 
+            case TOKscope:
+                if (peekNext() == TOKlparen)
+                    goto Ldeclaration;
+                stc = STCscope;
+                goto Lstc;
+
             case TOKimmutable:
                 if (peekNext() == TOKlparen)
                     goto Ldeclaration;
@@ -455,7 +461,6 @@ Dsymbols *Parser::parseDeclDefs(int once, Dsymbol **pLastDecl, PrefixAttributes 
 
             case TOKfinal:        stc = STCfinal;        goto Lstc;
             case TOKauto:         stc = STCauto;         goto Lstc;
-            case TOKscope:        stc = STCscope;        goto Lstc;
             case TOKoverride:     stc = STCoverride;     goto Lstc;
             case TOKabstract:     stc = STCabstract;     goto Lstc;
             case TOKsynchronized: stc = STCsynchronized; goto Lstc;
@@ -4609,6 +4614,13 @@ Statement *Parser::parseStatement(int flags, const utf8_t** endPtr)
                             goto Lagain;
                         }
                         break;
+                    case TOKscope:
+                        if (peekNext() != TOKlparen)
+                        {
+                            stc = STCscope;
+                            goto Lagain;
+                        }
+                        break;
                     case TOKimmutable:
                         if (peekNext() != TOKlparen)
                         {
@@ -4791,17 +4803,16 @@ Statement *Parser::parseStatement(int flags, const utf8_t** endPtr)
         }
 
         case TOKscope:
-            if (peek(&token)->value != TOKlparen)
+        {
+            Token *next1 = peek(&token);
+            if (next1->value != TOKlparen)
                 goto Ldeclaration;              // scope used as storage class
-            nextToken();
-            check(TOKlparen);
-            if (token.value != TOKidentifier)
-            {   error("scope identifier expected");
-                goto Lerror;
-            }
-            else
-            {   TOK t = TOKon_scope_exit;
-                Identifier *id = token.ident;
+            // next token is lparen, look at second next
+            Token *next2 = peek(next1);
+            if (next2->value == TOKidentifier)
+            {
+                TOK t = TOKon_scope_exit;
+                Identifier *id = next2->ident;
 
                 if (id == Id::exit)
                     t = TOKon_scope_exit;
@@ -4810,13 +4821,22 @@ Statement *Parser::parseStatement(int flags, const utf8_t** endPtr)
                 else if (id == Id::success)
                     t = TOKon_scope_success;
                 else
-                    error("valid scope identifiers are exit, failure, or success, not %s", id->toChars());
+                    // scope used as type constructor
+                    goto Ldeclaration;
+                // scope statement
+                token = *next2;
                 nextToken();
                 check(TOKrparen);
                 Statement *st = parseStatement(PScurlyscope);
                 s = new OnScopeStatement(loc, t, st);
                 break;
             }
+            else
+            {
+                // not an identifier - try parsing as type constructor
+                goto Ldeclaration;
+            }
+        }
 
         case TOKdebug:
             nextToken();
@@ -5348,12 +5368,14 @@ int Parser::isDeclaration(Token *t, int needId, TOK endtok, Token **pt)
     {
         if ((t->value == TOKconst ||
              t->value == TOKimmutable ||
+             t->value == TOKscope ||
              t->value == TOKwild ||
              t->value == TOKshared) &&
             peek(t)->value != TOKlparen)
         {
             /* const type
              * immutable type
+             * scope type
              * shared type
              * wild type
              */
@@ -5504,9 +5526,10 @@ int Parser::isBasicType(Token **pt)
 
         case TOKconst:
         case TOKimmutable:
+        case TOKscope:
         case TOKshared:
         case TOKwild:
-            // const(type)  or  immutable(type)  or  shared(type)  or  wild(type)
+            // const(type)  or  immutable(type)  or  scope(type)  or  shared(type)  or  wild(type)
             t = peek(t);
             if (t->value != TOKlparen)
                 goto Lfalse;
@@ -5675,6 +5698,7 @@ int Parser::isDeclarator(Token **pt, int *haveId, int *haveTpl, TOK endtok)
                     {
                         case TOKconst:
                         case TOKimmutable:
+                        case TOKscope:
                         case TOKshared:
                         case TOKwild:
                         case TOKpure:
@@ -5744,13 +5768,13 @@ int Parser::isParameters(Token **pt)
             case TOKout:
             case TOKref:
             case TOKlazy:
-            case TOKscope:
             case TOKfinal:
             case TOKauto:
                 continue;
 
             case TOKconst:
             case TOKimmutable:
+            case TOKscope:
             case TOKshared:
             case TOKwild:
                 t = peek(t);
@@ -6380,6 +6404,7 @@ Expression *Parser::parsePrimaryExp()
                          token.value == TOKparameters ||
                          token.value == TOKconst && peek(&token)->value == TOKrparen ||
                          token.value == TOKimmutable && peek(&token)->value == TOKrparen ||
+                         token.value == TOKscope && peek(&token)->value == TOKrparen ||
                          token.value == TOKshared && peek(&token)->value == TOKrparen ||
                          token.value == TOKwild && peek(&token)->value == TOKrparen ||
                          token.value == TOKfunction ||
@@ -6798,6 +6823,13 @@ Expression *Parser::parseUnaryExp()
                         if (peekNext() == TOKlparen)
                             break;
                         m |= MODimmutable;
+                        nextToken();
+                        continue;
+
+                    case TOKscope:
+                        if (peekNext() == TOKlparen)
+                            break;
+                        m |= MODscope;
                         nextToken();
                         continue;
 

@@ -666,6 +666,91 @@ Type *Type::sharedWildConstOf()
     return t;
 }
 
+Type *Type::scopeOf()
+{
+    //printf("Type::scopeOf() %p, %s\n", this, toChars());
+    if (mod == MODscope)
+        return this;
+    if (oto)
+    {
+        assert(oto->mod == MODscope);
+        return oto;
+    }
+    Type *t = makeScope();
+    t = t->merge();
+    t->fixTo(this);
+    //printf("\t%p %s\n", t, t->toChars());
+    return t;
+}
+
+Type *Type::scopeConstOf()
+{
+    //printf("Type::scopeConstOf() %p, %s\n", this, toChars());
+    if (mod == (MODscope | MODconst))
+        return this;
+    if (octo)
+    {
+        assert(octo->mod == (MODscope | MODconst));
+        return octo;
+    }
+    Type *t = makeScopeConst();
+    t = t->merge();
+    t->fixTo(this);
+    //printf("\t%p %s\n", t, t->toChars());
+    return t;
+}
+
+Type *Type::scopeImmutableOf()
+{
+    //printf("Type::scopeImmutableOf() %p, %s\n", this, toChars());
+    if (mod == (MODscope | MODimmutable))
+        return this;
+    if (oito)
+    {
+        assert(oito->mod == (MODscope | MODimmutable));
+        return oito;
+    }
+    Type *t = makeScopeImmutable();
+    t = t->merge();
+    t->fixTo(this);
+    //printf("\t%p %s\n", t, t->toChars());
+    return t;
+}
+
+Type *Type::scopeWildOf()
+{
+    //printf("Type::scopeWildOf() %p, %s\n", this, toChars());
+    if (mod == (MODscope | MODwild))
+        return this;
+    if (owto)
+    {
+        assert(owto->mod == (MODscope | MODwild));
+        return owto;
+    }
+    Type *t = makeScopeWild();
+    t = t->merge();
+    t->fixTo(this);
+    //printf("\t%p %s\n", t, t->toChars());
+    return t;
+}
+
+Type *Type::scopeWildConstOf()
+{
+    //printf("Type::scopeWildConstOf() %p, %s\n", this, toChars());
+    if (mod == (MODscope | MODwild))
+        return this;
+    if (owcto)
+    {
+        assert(owcto->mod == (MODscope | MODwildconst));
+        return owcto;
+    }
+    Type *t = makeScopeWildConst();
+    t = t->merge();
+    t->fixTo(this);
+    //printf("\t%p %s\n", t, t->toChars());
+    return t;
+}
+
 /**********************************
  * For our new type 'this', which is type-constructed from t,
  * fill in the cto, ito, sto, scto, wto shortcuts.
@@ -690,11 +775,15 @@ void Type::fixTo(Type *t)
             case MODshared | MODwild:        swto = t;  break;
             case MODshared | MODwildconst:  swcto = t;  break;
             case MODimmutable:                ito = t;  break;
+            case MODscope:                    oto = t;  break;
+            case MODscope | MODconst:        octo = t;  break;
+            case MODscope | MODimmutable:    oito = t;  break;
+            case MODscope | MODwild:         owto = t;  break;
+            case MODscope | MODwildconst:   owcto = t;  break;
         }
     }
 
     assert(mod != t->mod);
-#define X(m, n) (((m) << 4) | (n))
     switch (mod)
     {
         case 0:
@@ -735,6 +824,31 @@ void Type::fixTo(Type *t)
             t->swcto = this;
             break;
 
+        case MODscope:
+            oto = mto;
+            t->oto = this;
+            break;
+
+        case MODscope | MODconst:
+            octo = mto;
+            t->octo = this;
+            break;
+
+        case MODscope | MODimmutable:
+            oito = mto;
+            t->oito = this;
+            break;
+
+        case MODscope | MODwild:
+            owto = mto;
+            t->owto = this;
+            break;
+
+        case MODscope | MODwildconst:
+            owcto = mto;
+            t->owcto = this;
+            break;
+
         case MODimmutable:
             t->ito = this;
             if (t->  cto) t->  cto->ito = this;
@@ -744,12 +858,16 @@ void Type::fixTo(Type *t)
             if (t-> wcto) t-> wcto->ito = this;
             if (t-> swto) t-> swto->ito = this;
             if (t->swcto) t->swcto->ito = this;
+            if (t->  oto) t->  oto->ito = this;
+            if (t-> octo) t-> octo->ito = this;
+            if (t-> oito) t-> oito->ito = this;
+            if (t-> owto) t-> owto->ito = this;
+            if (t->owcto) t->owcto->ito = this;
             break;
 
         default:
             assert(0);
     }
-#undef X
 
     check();
     t->check();
@@ -773,6 +891,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODconst:
@@ -784,6 +907,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODwild:
@@ -795,6 +923,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODwildconst:
@@ -806,6 +939,11 @@ void Type::check()
             assert(! wcto ||  wcto->mod == 0);
             assert(! swto ||  swto->mod == (MODshared | MODwild));
             assert(!swcto || swcto->mod == (MODshared | MODwildconst));
+            assert(!  oto ||   oto->mod == MODscope);
+            assert(! octo ||  octo->mod == (MODscope | MODconst));
+            assert(! oito ||  oito->mod == (MODscope | MODimmutable));
+            assert(! owto ||  owto->mod == (MODscope | MODwild));
+            assert(!owcto || owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODshared:
@@ -817,6 +955,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODshared | MODconst:
@@ -828,6 +971,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODshared | MODwild:
@@ -839,6 +987,11 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == 0);
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODshared | MODwildconst:
@@ -850,6 +1003,11 @@ void Type::check()
             assert(! wcto ||  wcto->mod == MODwildconst);
             assert(! swto ||  swto->mod == (MODshared | MODwild));
             assert(!swcto || swcto->mod == 0);
+            assert(!  oto ||   oto->mod == MODscope);
+            assert(! octo ||  octo->mod == (MODscope | MODconst));
+            assert(! oito ||  oito->mod == (MODscope | MODimmutable));
+            assert(! owto ||  owto->mod == (MODscope | MODwild));
+            assert(!owcto || owcto->mod == (MODscope | MODwildconst));
             break;
 
         case MODimmutable:
@@ -861,6 +1019,91 @@ void Type::check()
             if (wcto) assert(wcto->mod == MODwildconst);
             if (swto) assert(swto->mod == (MODshared | MODwild));
             if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
+            break;
+
+        case MODscope:
+            if (cto) assert(cto->mod == MODconst);
+            if (ito) assert(ito->mod == MODimmutable);
+            if (sto) assert(sto->mod == MODshared);
+            if (scto) assert(scto->mod == (MODshared | MODconst));
+            if (wto) assert(wto->mod == MODwild);
+            if (wcto) assert(wcto->mod == MODwildconst);
+            if (swto) assert(swto->mod == (MODshared | MODwild));
+            if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == 0);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
+            break;
+
+        case MODscope | MODconst:
+            if (cto) assert(cto->mod == MODconst);
+            if (ito) assert(ito->mod == MODimmutable);
+            if (sto) assert(sto->mod == MODshared);
+            if (scto) assert(scto->mod == (MODshared | MODconst));
+            if (wto) assert(wto->mod == MODwild);
+            if (wcto) assert(wcto->mod == MODwildconst);
+            if (swto) assert(swto->mod == (MODshared | MODwild));
+            if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == 0);
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
+            break;
+
+        case MODscope | MODimmutable:
+            if (cto) assert(cto->mod == MODconst);
+            if (ito) assert(ito->mod == MODimmutable);
+            if (sto) assert(sto->mod == MODshared);
+            if (scto) assert(scto->mod == (MODshared | MODconst));
+            if (wto) assert(wto->mod == MODwild);
+            if (wcto) assert(wcto->mod == MODwildconst);
+            if (swto) assert(swto->mod == (MODshared | MODwild));
+            if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == 0);
+            if (owto) assert(owto->mod == (MODscope | MODwild));
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
+            break;
+
+        case MODscope | MODwild:
+            if (cto) assert(cto->mod == MODconst);
+            if (ito) assert(ito->mod == MODimmutable);
+            if (sto) assert(sto->mod == MODshared);
+            if (scto) assert(scto->mod == (MODshared | MODconst));
+            if (wto) assert(wto->mod == MODwild);
+            if (wcto) assert(wcto->mod == MODwildconst);
+            if (swto) assert(swto->mod == (MODshared | MODwild));
+            if (swcto) assert(swcto->mod == (MODshared | MODwildconst));
+            if (oto) assert(oto->mod == MODscope);
+            if (octo) assert(octo->mod == (MODscope | MODconst));
+            if (oito) assert(oito->mod == (MODscope | MODimmutable));
+            if (owto) assert(owto->mod == 0);
+            if (owcto) assert(owcto->mod == (MODscope | MODwildconst));
+            break;
+
+        case MODscope | MODwildconst:
+            assert(!  cto ||   cto->mod == MODconst);
+            assert(!  ito ||   ito->mod == MODimmutable);
+            assert(!  sto ||   sto->mod == MODshared);
+            assert(! scto ||  scto->mod == (MODshared | MODconst));
+            assert(!  wto ||   wto->mod == MODwild);
+            assert(! wcto ||  wcto->mod == MODwildconst);
+            assert(! swto ||  swto->mod == (MODshared | MODwild));
+            assert(!swcto || swcto->mod == (MODshared | MODwildconst));
+            assert(!  oto ||   oto->mod == MODscope);
+            assert(! octo ||  octo->mod == (MODscope | MODconst));
+            assert(! oito ||  oito->mod == (MODscope | MODimmutable));
+            assert(! owto ||  owto->mod == (MODscope | MODwild));
+            assert(!owcto || owcto->mod == 0);
             break;
 
         default:
@@ -882,6 +1125,11 @@ void Type::check()
             case MODshared | MODwild:
             case MODshared | MODwildconst:
             case MODimmutable:
+            case MODscope:
+            case MODscope | MODconst:
+            case MODscope | MODimmutable:
+            case MODscope | MODwild:
+            case MODscope | MODwildconst:
                 assert(tn->mod == MODimmutable || (tn->mod & mod) == mod);
                 break;
 
@@ -958,6 +1206,46 @@ Type *Type::makeSharedWildConst()
     return t;
 }
 
+Type *Type::makeScope()
+{
+    if (oto) return oto;
+    Type *t = this->nullAttributes();
+    t->mod = MODscope;
+    return t;
+}
+
+Type *Type::makeScopeConst()
+{
+    if (octo) return octo;
+    Type *t = this->nullAttributes();
+    t->mod = MODscope | MODconst;
+    return t;
+}
+
+Type *Type::makeScopeImmutable()
+{
+    if (oito) return oito;
+    Type *t = this->nullAttributes();
+    t->mod = MODscope | MODimmutable;
+    return t;
+}
+
+Type *Type::makeScopeWild()
+{
+    if (owto) return owto;
+    Type *t = this->nullAttributes();
+    t->mod = MODscope | MODwild;
+    return t;
+}
+
+Type *Type::makeScopeWildConst()
+{
+    if (owcto) return owcto;
+    Type *t = this->nullAttributes();
+    t->mod = MODscope | MODwildconst;
+    return t;
+}
+
 Type *Type::makeMutable()
 {
     Type *t = this->nullAttributes();
@@ -972,6 +1260,7 @@ Type *Type::makeMutable()
 
 Type *Type::addSTC(StorageClass stc)
 {
+// TODO
     Type *t = this;
     if (t->isImmutable())
         ;
@@ -1047,6 +1336,7 @@ StorageClass ModToStc(unsigned mod)
     if (mod & MODconst)     stc |= STCconst;
     if (mod & MODwild)      stc |= STCwild;
     if (mod & MODshared)    stc |= STCshared;
+    if (mod & MODscope)     stc |= STCscope;
     return stc;
 }
 
@@ -1095,6 +1385,26 @@ Type *Type::castMod(MOD mod)
             t = immutableOf();
             break;
 
+        case MODscope:
+            t = scopeOf();
+            break;
+
+        case MODscope | MODconst:
+            t = scopeConstOf();
+            break;
+
+        case MODscope | MODimmutable:
+            t = scopeImmutableOf();
+            break;
+
+        case MODscope | MODwild:
+            t = scopeWildOf();
+            break;
+
+        case MODscope | MODwildconst:
+            t = scopeWildConstOf();
+            break;
+
         default:
             assert(0);
     }
@@ -1109,6 +1419,7 @@ Type *Type::castMod(MOD mod)
 
 Type *Type::addMod(MOD mod)
 {
+// TODO
     /* Add anything to immutable, and it remains immutable
      */
     Type *t = this;
@@ -1213,6 +1524,7 @@ Type *Type::addMod(MOD mod)
 
 Type *Type::addStorageClass(StorageClass stc)
 {
+// TODO
     /* Just translate to MOD bits and let addMod() do the work
      */
     MOD mod = 0;
@@ -1391,6 +1703,7 @@ bool MODimplicitConv(MOD modfrom, MOD modto)
     if (modfrom == modto)
         return true;
 
+// TODO
     //printf("MODimplicitConv(from = %x, to = %x)\n", modfrom, modto);
     #define X(m, n) (((m) << 4) | (n))
     switch (X(modfrom & ~MODshared, modto & ~MODshared))
@@ -1419,6 +1732,7 @@ bool MODmethodConv(MOD modfrom, MOD modto)
     if (MODimplicitConv(modfrom, modto))
         return true;
 
+// TODO
     #define X(m, n) (((m) << 4) | (n))
     switch (X(modfrom, modto))
     {
@@ -1444,6 +1758,7 @@ MOD MODmerge(MOD mod1, MOD mod2)
     if (mod1 == mod2)
         return mod1;
 
+// TODO
     //printf("MODmerge(1 = %x, 2 = %x)\n", mod1, mod2);
     MOD result = 0;
     if ((mod1 | mod2) & MODshared)
@@ -1475,6 +1790,7 @@ MOD MODmerge(MOD mod1, MOD mod2)
  */
 void MODtoDecoBuffer(OutBuffer *buf, MOD mod)
 {
+// TODO
     switch (mod)
     {   case 0:
             break;
@@ -1512,6 +1828,7 @@ void MODtoDecoBuffer(OutBuffer *buf, MOD mod)
  */
 void MODtoBuffer(OutBuffer *buf, MOD mod)
 {
+// TODO
     switch (mod)
     {
         case 0:
@@ -1635,7 +1952,7 @@ char *Type::modToChars()
 void* for the work param and a string representation of the attribute. */
 int Type::modifiersApply(void *param, int (*fp)(void *, const char *))
 {
-    static unsigned char modsArr[] = { MODconst, MODimmutable, MODwild, MODshared };
+    static unsigned char modsArr[] = { MODconst, MODimmutable, MODwild, MODshared, MODscope };
 
     for (size_t idx = 0; idx < 4; ++idx)
     {
@@ -2099,6 +2416,8 @@ L1:
         t = t->addMod(MODconst);
     if (isShared())
         t = t->addMod(MODshared);
+    if (isScope())
+        t = t->addMod(MODconst);
 
     //printf("-Type::substWildTo t = %s\n", t->toChars());
     return t;
@@ -2109,6 +2428,7 @@ Type *TypeFunction::substWildTo(unsigned)
     if (!iswild && !(mod & MODwild))
         return this;
 
+// TODO
     // Substitude inout qualifier of function type to mutable or immutable
     // would break type system. Instead substitude inout to the most weak
     // qualifer - const.
@@ -5305,6 +5625,8 @@ int Type::covariant(Type *t, StorageClass *pstc)
     printf("mod = %x, %x\n", mod, t->mod);
 #endif
 
+// TODO
+
     if (pstc)
         *pstc = 0;
     StorageClass stc = 0;
@@ -5520,6 +5842,8 @@ void TypeFunction::toDecoBuffer(OutBuffer *buf, int flag)
 
 Type *TypeFunction::semantic(Loc loc, Scope *sc)
 {
+// TODO
+
     if (deco)                   // if semantic() already run
     {
         //printf("already done\n");
@@ -5934,6 +6258,7 @@ void TypeFunction::purityLevel()
 
 MATCH TypeFunction::callMatch(Type *tthis, Expressions *args, int flag)
 {
+// TODO
     //printf("TypeFunction::callMatch() %s\n", toChars());
     MATCH match = MATCHexact;           // assume exact match
     unsigned char wildmatch = 0;

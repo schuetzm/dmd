@@ -125,7 +125,8 @@ enum MODFlags
     MODshared    = 2, // type is shared
     MODwild      = 8, // type is wild
     MODwildconst = (MODwild | MODconst), // type is wild const
-    MODmutable   = 0x10       // type is mutable (only used in wildcard matching)
+    MODmutable   = 0x10,      // type is mutable (only used in wildcard matching)
+    MODscope     = 0x20       // type is scope
 };
 typedef unsigned char MOD;
 
@@ -151,6 +152,11 @@ public:
     Type *wcto;         // MODwildconst             ? naked version of this type : wild const version
     Type *swto;         // MODshared | MODwild      ? naked version of this type : shared wild version
     Type *swcto;        // MODshared | MODwildconst ? naked version of this type : shared wild const version
+    Type *oto;          // MODscope                 ? naked version of this type : scope mutable version
+    Type *octo;         // MODscope | MODconst      ? naked version of this type : scope const version
+    Type *oito;         // MODscope | MODimmutable  ? naked version of this type : scope immutable version
+    Type *owto;         // MODscope | MODwild       ? naked version of this type : scope wild version
+    Type *owcto;        // MODscope | MODwildconst  ? naked version of this type : scope wild const version
 
     Type *pto;          // merged pointer to this type
     Type *rto;          // reference to this type
@@ -277,15 +283,20 @@ public:
     virtual bool isAssignable();
     virtual bool checkBoolean(); // if can be converted to boolean value
     virtual void checkDeprecated(Loc loc, Scope *sc);
-    bool isConst()       { return (mod & MODconst) != 0; }
-    bool isImmutable()   { return (mod & MODimmutable) != 0; }
-    bool isMutable()     { return (mod & (MODconst | MODimmutable | MODwild)) == 0; }
-    bool isShared()      { return (mod & MODshared) != 0; }
-    bool isSharedConst() { return (mod & (MODshared | MODconst)) == (MODshared | MODconst); }
-    bool isWild()        { return (mod & MODwild) != 0; }
-    bool isWildConst()   { return (mod & MODwildconst) == MODwildconst; }
-    bool isSharedWild()  { return (mod & (MODshared | MODwild)) == (MODshared | MODwild); }
-    bool isNaked()       { return mod == 0; }
+    bool isConst()          { return (mod & MODconst) != 0; }
+    bool isImmutable()      { return (mod & MODimmutable) != 0; }
+    bool isMutable()        { return (mod & (MODconst | MODimmutable | MODwild)) == 0; }
+    bool isShared()         { return (mod & MODshared) != 0; }
+    bool isSharedConst()    { return (mod & (MODshared | MODconst)) == (MODshared | MODconst); }
+    bool isWild()           { return (mod & MODwild) != 0; }
+    bool isWildConst()      { return (mod & MODwildconst) == MODwildconst; }
+    bool isSharedWild()     { return (mod & (MODshared | MODwild)) == (MODshared | MODwild); }
+    bool isScope()          { return (mod & MODscope) != 0; }
+    bool isScopeConst()     { return (mod & (MODscope | MODconst)) == (MODscope | MODconst); }
+    bool isScopeImmutable() { return (mod & (MODscope | MODimmutable)) == (MODscope | MODimmutable); }
+    bool isScopeWild()      { return (mod & (MODscope | MODwild)) == (MODscope | MODwild); }
+    bool isScopeWildConst() { return (mod & (MODscope | MODwildconst)) == (MODscope | MODwildconst); }
+    bool isNaked()          { return mod == 0; }
     Type *nullAttributes();
     Type *constOf();
     Type *immutableOf();
@@ -297,6 +308,11 @@ public:
     Type *wildConstOf();
     Type *sharedWildOf();
     Type *sharedWildConstOf();
+    Type *scopeOf();
+    Type *scopeConstOf();
+    Type *scopeImmutableOf();
+    Type *scopeWildOf();
+    Type *scopeWildConstOf();
     void fixTo(Type *t);
     void check();
     Type *addSTC(StorageClass stc);
@@ -317,6 +333,11 @@ public:
     virtual Type *makeWildConst();
     virtual Type *makeSharedWild();
     virtual Type *makeSharedWildConst();
+    virtual Type *makeScope();
+    virtual Type *makeScopeConst();
+    virtual Type *makeScopeImmutable();
+    virtual Type *makeScopeWild();
+    virtual Type *makeScopeWildConst();
     virtual Type *makeMutable();
     virtual Dsymbol *toDsymbol(Scope *sc);
     virtual Type *toBasetype();
