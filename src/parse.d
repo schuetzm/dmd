@@ -4258,7 +4258,23 @@ public:
         auto fd = new FuncLiteralDeclaration(loc, Loc(), tf, save, null);
         if (token.value == TOKgoesto)
         {
+//void foo(alias fun)() {
+//    pragma(msg, typeof(fun!int));
+//}
+//
+//void main() {
+//    foo!(a => a);
+//    foo!(a => (a));
+//    foo!(a => ({ return a; }));
+//    foo!(a => { return a; });
+//    foo!((a) => a);
+//    foo!((a) => (a));
+//    foo!((a) => ({ return a; }));
+//    foo!((a) => { return a; });
+//}
             check(TOKgoesto);
+            if (token.value == TOKlcurly)
+                error(loc, "`... => { ... }` declares a function returning another function; if this is really what you want, surround the right-hand side by parentheses: ... => ({ ... }), otherwise remove the `=>`");
             Loc returnloc = token.loc;
             Expression ae = parseAssignExp();
             fd.fbody = new ReturnStatement(returnloc, ae);
